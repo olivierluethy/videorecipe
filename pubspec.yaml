@@ -1,0 +1,49 @@
+name: videorecipe
+description: "Extract structured recipes from YouTube cooking videos."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.11.5
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+
+  # State management
+  flutter_riverpod: ^2.6.1
+
+  # Networking
+  dio: ^5.7.0
+
+  # Local storage
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+  path_provider: ^2.1.5
+
+  # Secure storage for API key
+  flutter_secure_storage: ^9.2.2
+
+  # YouTube transcript extraction
+  youtube_explode_dart: ^2.3.4
+
+  # Animations
+  flutter_animate: ^4.5.2
+  confetti: ^0.8.0
+
+  # Typography
+  google_fonts: ^6.2.1
+
+  # Utilities
+  url_launcher: ^6.3.1
+  uuid: ^4.5.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
