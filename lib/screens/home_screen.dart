@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:share_plus/share_plus.dart';
 
+import '../models/recipe.dart';
 import '../providers/recipe_provider.dart';
 import '../services/clipboard_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/recipe_share.dart';
 import '../widgets/paste_button.dart';
 import '../widgets/recipe_card.dart';
 import 'loading_screen.dart';
@@ -63,6 +66,43 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         builder: (_) => LoadingScreen(youtubeUrl: url),
       ),
     );
+  }
+
+  Future<void> _shareRecipe(Recipe recipe) async {
+    final text = formatRecipeForShare(recipe);
+    final box = context.findRenderObject() as RenderBox?;
+    await Share.share(
+      text,
+      subject: recipe.dishName,
+      sharePositionOrigin:
+          box != null ? box.localToGlobal(Offset.zero) & box.size : null,
+    );
+  }
+
+  Future<void> _confirmDelete(Recipe recipe) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: const Text('Delete recipe?'),
+        content: Text(
+            'Remove "${recipe.dishName}" from your saved recipes?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      await ref.read(recipesProvider.notifier).remove(recipe.id);
+    }
   }
 
   Future<void> _showManualEntry() async {
@@ -295,6 +335,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                               ),
                             );
                           },
+                          onShare: () => _shareRecipe(recipe),
+                          onDelete: () => _confirmDelete(recipe),
                         ),
                       );
                     },

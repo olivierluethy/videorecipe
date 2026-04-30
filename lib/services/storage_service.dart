@@ -7,6 +7,7 @@ class StorageService {
   static const String _settingsBoxName = 'settings';
 
   static const String _kClipboardAutoDetect = 'clipboardAutoDetect';
+  static const String _kHasSeenOnboarding = 'hasSeenOnboarding';
 
   late final Box<String> _recipeBox;
   late final Box _settingsBox;
@@ -51,4 +52,10 @@ class StorageService {
 
   Future<void> setClipboardAutoDetect(bool value) =>
       _settingsBox.put(_kClipboardAutoDetect, value);
+
+  bool get hasSeenOnboarding =>
+      _settingsBox.get(_kHasSeenOnboarding, defaultValue: false) as bool;
+
+  Future<void> setHasSeenOnboarding(bool value) =>
+      _settingsBox.put(_kHasSeenOnboarding, value);
 }

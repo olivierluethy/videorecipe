@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'providers/recipe_provider.dart';
 import 'screens/home_screen.dart';
+import 'screens/intro_screen.dart';
 import 'services/storage_service.dart';
 import 'theme/app_theme.dart';
 
@@ -24,18 +25,21 @@ Future<void> main() async {
   final storage = StorageService();
   await storage.init();
 
+  final showIntro = !storage.hasSeenOnboarding;
+
   runApp(
     ProviderScope(
       overrides: [
         storageServiceProvider.overrideWithValue(storage),
       ],
-      child: const VideoRecipeApp(),
+      child: VideoRecipeApp(showIntro: showIntro),
     ),
   );
 }
 
 class VideoRecipeApp extends StatelessWidget {
-  const VideoRecipeApp({super.key});
+  final bool showIntro;
+  const VideoRecipeApp({super.key, required this.showIntro});
 
   @override
   Widget build(BuildContext context) {
@@ -45,7 +49,7 @@ class VideoRecipeApp extends StatelessWidget {
       themeMode: ThemeMode.dark,
       darkTheme: AppTheme.dark(),
       theme: AppTheme.dark(),
-      home: const HomeScreen(),
+      home: showIntro ? const IntroScreen() : const HomeScreen(),
     );
   }
 }

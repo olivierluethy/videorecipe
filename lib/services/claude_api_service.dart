@@ -36,7 +36,7 @@ You are a recipe extraction assistant. Given the transcript and metadata of a Yo
 Rules:
 - Use the most natural, common name for the dish.
 - Quantities should be concise (e.g., "2 cups", "1 tbsp", "to taste").
-- Steps should be numbered chronologically, concise, action-first imperative.
+- Steps should be in chronological order, concise, action-first imperative.
 - If a value is genuinely unknown, make a reasonable best-guess based on the cuisine/dish (do not return null or empty).
 - Output JSON only. No prose, no markdown.
 ''';
@@ -84,7 +84,7 @@ $clipped
 
     final body = {
       'model': _model,
-      'max_tokens': 2048,
+      'max_tokens': 3072,
       'system': [
         {
           'type': 'text',
@@ -137,6 +137,13 @@ $clipped
 
     final parsed = _parseRecipeJson(text);
 
+    // Tolerate stale `{text, timestampSeconds}` objects in case the model
+    // ignores the prompt; otherwise treat each entry as a plain string.
+    final steps = ((parsed['steps'] as List?) ?? const []).map((e) {
+      if (e is Map) return (e['text'] ?? '').toString();
+      return e.toString();
+    }).toList();
+
     return Recipe(
       id: const Uuid().v4(),
       dishName: (parsed['dishName'] ?? 'Untitled dish').toString(),
@@ -148,9 +155,7 @@ $clipped
       ingredients: ((parsed['ingredients'] as List?) ?? [])
           .map((e) => Ingredient.fromJson(Map<String, dynamic>.from(e as Map)))
           .toList(),
-      steps: ((parsed['steps'] as List?) ?? [])
-          .map((e) => e.toString())
-          .toList(),
+      steps: steps,
       tips: ((parsed['tips'] as List?) ?? [])
           .map((e) => e.toString())
           .toList(),

@@ -109,23 +109,37 @@ class Recipe {
         'createdAt': createdAt.toIso8601String(),
       };
 
-  factory Recipe.fromJson(Map<String, dynamic> json) => Recipe(
-        id: json['id'] as String,
-        dishName: (json['dishName'] ?? '').toString(),
-        description: (json['description'] ?? '').toString(),
-        totalTimeMinutes: (json['totalTimeMinutes'] as num?)?.toInt() ?? 0,
-        difficulty: _difficultyFromString(json['difficulty'] as String?),
-        servings: (json['servings'] as num?)?.toInt() ?? 0,
-        ingredients: ((json['ingredients'] as List?) ?? [])
-            .map((e) => Ingredient.fromJson(Map<String, dynamic>.from(e as Map)))
-            .toList(),
-        steps: ((json['steps'] as List?) ?? []).map((e) => e.toString()).toList(),
-        tips: ((json['tips'] as List?) ?? []).map((e) => e.toString()).toList(),
-        youtubeUrl: (json['youtubeUrl'] ?? '').toString(),
-        thumbnailUrl: json['thumbnailUrl'] as String?,
-        createdAt: DateTime.tryParse(json['createdAt']?.toString() ?? '') ??
-            DateTime.now(),
-      );
+  factory Recipe.fromJson(Map<String, dynamic> json) {
+    // Tolerate two legacy shapes saved before timestamps were removed:
+    //   * `steps: [{text, timestampSeconds}]` — extract the `text` field
+    //   * `steps: ["..."]` (with or without a sibling `stepTimestampsSeconds`)
+    // In either case the in-memory representation is now a plain List<String>.
+    final steps = ((json['steps'] as List?) ?? const []).map((e) {
+      if (e is Map) return (e['text'] ?? '').toString();
+      return e.toString();
+    }).toList();
+
+    return Recipe(
+      id: json['id'] as String,
+      dishName: (json['dishName'] ?? '').toString(),
+      description: (json['description'] ?? '').toString(),
+      totalTimeMinutes: (json['totalTimeMinutes'] as num?)?.toInt() ?? 0,
+      difficulty: _difficultyFromString(json['difficulty'] as String?),
+      servings: (json['servings'] as num?)?.toInt() ?? 0,
+      ingredients: ((json['ingredients'] as List?) ?? [])
+          .map((e) =>
+              Ingredient.fromJson(Map<String, dynamic>.from(e as Map)))
+          .toList(),
+      steps: steps,
+      tips: ((json['tips'] as List?) ?? [])
+          .map((e) => e.toString())
+          .toList(),
+      youtubeUrl: (json['youtubeUrl'] ?? '').toString(),
+      thumbnailUrl: json['thumbnailUrl'] as String?,
+      createdAt: DateTime.tryParse(json['createdAt']?.toString() ?? '') ??
+          DateTime.now(),
+    );
+  }
 
   String toRawJson() => jsonEncode(toJson());
 

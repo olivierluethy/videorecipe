@@ -6,11 +6,15 @@ import '../theme/app_theme.dart';
 class RecipeCard extends StatelessWidget {
   final Recipe recipe;
   final VoidCallback onTap;
+  final VoidCallback onShare;
+  final VoidCallback onDelete;
 
   const RecipeCard({
     super.key,
     required this.recipe,
     required this.onTap,
+    required this.onShare,
+    required this.onDelete,
   });
 
   @override
@@ -23,7 +27,7 @@ class RecipeCard extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(18),
         child: Padding(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.fromLTRB(12, 12, 8, 12),
           child: Row(
             children: [
               ClipRRect(
@@ -38,6 +42,7 @@ class RecipeCard extends StatelessWidget {
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
                       recipe.dishName,
@@ -64,8 +69,23 @@ class RecipeCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right,
-                  color: AppColors.textTertiary, size: 22),
+              const SizedBox(width: 4),
+              Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _CardActionButton(
+                    icon: Icons.ios_share,
+                    tooltip: 'Share',
+                    onTap: onShare,
+                  ),
+                  const SizedBox(height: 4),
+                  _CardActionButton(
+                    icon: Icons.delete_outline,
+                    tooltip: 'Delete',
+                    onTap: onDelete,
+                  ),
+                ],
+              ),
             ],
           ),
         ),
@@ -139,6 +159,38 @@ class _Pill extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _CardActionButton extends StatelessWidget {
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+  const _CardActionButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(10),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(10),
+          child: Container(
+            width: 34,
+            height: 34,
+            alignment: Alignment.center,
+            child: Icon(icon, size: 18, color: AppColors.textSecondary),
+          ),
+        ),
       ),
     );
   }
