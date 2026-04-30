@@ -1,0 +1,6 @@
+/vendor/
+/.env
+/data/
+*.log
+*.zip
+.DS_Store

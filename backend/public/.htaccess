@@ -1,0 +1,4 @@
+RewriteEngine On
+# Skip rewriting for actual files (e.g. static assets, if any are ever added).
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^ index.php [QSA,L]

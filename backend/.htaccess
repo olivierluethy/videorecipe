@@ -1,0 +1,12 @@
+# Used on shared hosts (cPanel, Hostinger, etc.) when the document root can't
+# be changed to the public/ directory. Rewrites all incoming requests to
+# public/ so vendor/, .env, and src/ are never web-reachable.
+RewriteEngine On
+RewriteRule ^$ public/ [L]
+RewriteRule (.*) public/$1 [L]
+
+# Belt-and-braces: explicitly forbid access to sensitive files even if a
+# misconfiguration lets the rewrite slip.
+<FilesMatch "^\.env|composer\.(json|lock)$">
+  Require all denied
+</FilesMatch>

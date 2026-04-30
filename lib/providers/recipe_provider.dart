@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/recipe.dart';
-import '../services/claude_api_service.dart';
+import '../services/backend_service.dart';
 import '../services/storage_service.dart';
 import '../services/youtube_transcript_service.dart';
 
@@ -10,8 +10,8 @@ final storageServiceProvider = Provider<StorageService>((ref) {
   throw UnimplementedError('StorageService must be overridden in main.dart');
 });
 
-final claudeApiServiceProvider = Provider<ClaudeApiService>((ref) {
-  return ClaudeApiService();
+final backendServiceProvider = Provider<BackendService>((ref) {
+  return BackendService();
 });
 
 final transcriptServiceProvider = Provider<YoutubeTranscriptService>((ref) {

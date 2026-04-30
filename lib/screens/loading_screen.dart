@@ -4,9 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../models/recipe.dart';
 import '../providers/recipe_provider.dart';
-import '../services/claude_api_service.dart';
+import '../services/backend_service.dart';
 import '../services/youtube_transcript_service.dart';
 import '../theme/app_theme.dart';
 import 'recipe_detail_screen.dart';
@@ -62,11 +61,11 @@ class _LoadingScreenState extends ConsumerState<LoadingScreen> {
   Future<void> _run() async {
     try {
       final transcriptService = ref.read(transcriptServiceProvider);
-      final apiService = ref.read(claudeApiServiceProvider);
+      final backend = ref.read(backendServiceProvider);
 
       final transcript =
           await transcriptService.fetchTranscript(widget.youtubeUrl);
-      final recipe = await apiService.extractRecipe(
+      final recipe = await backend.extractRecipe(
         transcript: transcript,
         youtubeUrl: widget.youtubeUrl,
       );
@@ -89,7 +88,7 @@ class _LoadingScreenState extends ConsumerState<LoadingScreen> {
       );
     } on TranscriptUnavailableException catch (e) {
       _failWith(e.message);
-    } on ClaudeApiException catch (e) {
+    } on BackendException catch (e) {
       _failWith(e.message);
     } catch (e) {
       _failWith('Something went wrong: $e');
