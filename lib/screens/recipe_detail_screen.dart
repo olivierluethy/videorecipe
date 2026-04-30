@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models/recipe.dart';
 import '../providers/recipe_provider.dart';
 import '../theme/app_theme.dart';
+import '../utils/quantity_scaler.dart';
 import '../widgets/celebration_animation.dart';
 import '../widgets/checklist_item.dart';
 
@@ -24,6 +25,9 @@ class _RecipeDetailScreenState extends ConsumerState<RecipeDetailScreen> {
   final Set<int> _checkedIngredients = <int>{};
   final Set<int> _checkedSteps = <int>{};
   bool _celebrationShown = false;
+
+  // null means "use the recipe's original servings"
+  int? _currentServings;
 
   Recipe? _findRecipe(List<Recipe> recipes) {
     for (final r in recipes) {
@@ -60,6 +64,33 @@ class _RecipeDetailScreenState extends ConsumerState<RecipeDetailScreen> {
     }
   }
 
+  Future<void> _confirmDelete(Recipe recipe) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: const Text('Delete recipe?'),
+        content: const Text('This will remove the recipe permanently.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      await ref.read(recipesProvider.notifier).remove(recipe.id);
+      if (!mounted) return;
+      Navigator.of(context).maybePop();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final recipes = ref.watch(recipesProvider);
@@ -79,209 +110,91 @@ class _RecipeDetailScreenState extends ConsumerState<RecipeDetailScreen> {
 
     _maybeShowCelebration(recipe);
 
-    return Scaffold(
-      body: SafeArea(
-        child: CustomScrollView(
-          slivers: [
-            SliverAppBar(
-              backgroundColor: AppColors.background,
-              elevation: 0,
-              pinned: false,
-              leading: IconButton(
-                icon: const Icon(Icons.arrow_back),
-                onPressed: () => Navigator.of(context).maybePop(),
-              ),
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.delete_outline,
-                      color: AppColors.textSecondary),
-                  onPressed: () async {
-                    final confirmed = await showDialog<bool>(
-                      context: context,
-                      builder: (ctx) => AlertDialog(
-                        backgroundColor: AppColors.surface,
-                        title: const Text('Delete recipe?'),
-                        content: const Text(
-                            'This will remove the recipe permanently.'),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(ctx, false),
-                            child: const Text('Cancel'),
-                          ),
-                          TextButton(
-                            onPressed: () => Navigator.pop(ctx, true),
-                            style: TextButton.styleFrom(
-                                foregroundColor: AppColors.error),
-                            child: const Text('Delete'),
-                          ),
-                        ],
-                      ),
-                    );
-                    if (confirmed == true) {
-                      await ref
-                          .read(recipesProvider.notifier)
-                          .remove(recipe.id);
-                      if (!mounted) return;
-                      Navigator.of(context).maybePop();
-                    }
-                  },
-                ),
-              ],
-            ),
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 30),
-              sliver: SliverList(
-                delegate: SliverChildListDelegate([
-                  _Header(recipe: recipe),
-                  const SizedBox(height: 18),
-                  _OverviewBar(recipe: recipe),
-                  const SizedBox(height: 24),
-                  _SectionTitle(
-                    title: 'Ingredients',
-                    trailing:
-                        '${_checkedIngredients.length} / ${recipe.ingredients.length}',
-                  ),
-                  const SizedBox(height: 8),
-                  ..._buildIngredientList(recipe),
-                  const SizedBox(height: 24),
-                  _SectionTitle(
-                    title: 'Steps',
-                    trailing:
-                        '${_checkedSteps.length} / ${recipe.steps.length}',
-                  ),
-                  const SizedBox(height: 8),
-                  ..._buildStepsList(recipe),
-                  if (recipe.tips.isNotEmpty) ...[
-                    const SizedBox(height: 24),
-                    const _SectionTitle(title: 'Tips'),
-                    const SizedBox(height: 8),
-                    ...recipe.tips.map((tip) => Padding(
-                          padding: const EdgeInsets.only(bottom: 10),
-                          child: Container(
-                            padding: const EdgeInsets.all(14),
-                            decoration: BoxDecoration(
-                              color: AppColors.surface,
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(
-                                color: AppColors.accent
-                                    .withValues(alpha: 0.25),
-                              ),
-                            ),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Icon(Icons.lightbulb_outline,
-                                    color: AppColors.accent, size: 20),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Text(
-                                    tip,
-                                    style: const TextStyle(
-                                      color: AppColors.textPrimary,
-                                      fontSize: 14,
-                                      height: 1.45,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        )),
-                  ],
-                  const SizedBox(height: 24),
-                  if (recipe.youtubeUrl.isNotEmpty)
-                    Center(
-                      child: TextButton.icon(
-                        onPressed: () => _openYoutube(recipe.youtubeUrl),
-                        icon: const Icon(Icons.play_circle_outline, size: 18),
-                        label: const Text('View original YouTube video'),
-                        style: TextButton.styleFrom(
-                          foregroundColor: AppColors.accent,
-                        ),
-                      ),
-                    ),
-                ]),
-              ),
+    final baseServings = recipe.servings <= 0 ? 1 : recipe.servings;
+    final currentServings = _currentServings ?? baseServings;
+    final ratio = currentServings / baseServings;
+
+    return DefaultTabController(
+      length: 3,
+      child: Scaffold(
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => Navigator.of(context).maybePop(),
+          ),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.delete_outline,
+                  color: AppColors.textSecondary),
+              onPressed: () => _confirmDelete(recipe),
             ),
           ],
+        ),
+        body: SafeArea(
+          top: false,
+          child: Column(
+            children: [
+              _Header(recipe: recipe),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 14, 20, 6),
+                child: _ServingsSelector(
+                  current: currentServings,
+                  base: baseServings,
+                  onChange: (v) => setState(() => _currentServings = v),
+                ),
+              ),
+              const SizedBox(height: 6),
+              const _RecipeTabBar(),
+              const Divider(
+                  height: 1, thickness: 1, color: AppColors.divider),
+              Expanded(
+                child: TabBarView(
+                  children: [
+                    _IngredientsTab(
+                      recipe: recipe,
+                      ratio: ratio,
+                      checked: _checkedIngredients,
+                      onToggle: (i) => setState(() {
+                        if (!_checkedIngredients.add(i)) {
+                          _checkedIngredients.remove(i);
+                        }
+                      }),
+                    ),
+                    _StepsTab(
+                      recipe: recipe,
+                      checked: _checkedSteps,
+                      onToggle: (i) => setState(() {
+                        if (!_checkedSteps.add(i)) {
+                          _checkedSteps.remove(i);
+                        }
+                      }),
+                    ),
+                    _TipsTab(recipe: recipe),
+                  ],
+                ),
+              ),
+              if (recipe.youtubeUrl.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: TextButton.icon(
+                    onPressed: () => _openYoutube(recipe.youtubeUrl),
+                    icon: const Icon(Icons.play_circle_outline, size: 18),
+                    label: const Text('View original YouTube video'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.accent,
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
   }
-
-  List<Widget> _buildIngredientList(Recipe recipe) {
-    if (recipe.ingredients.isEmpty) {
-      return const [
-        Text(
-          'No ingredients listed.',
-          style: TextStyle(color: AppColors.textSecondary),
-        ),
-      ];
-    }
-    return [
-      for (var i = 0; i < recipe.ingredients.length; i++)
-        ChecklistItem(
-          checked: _checkedIngredients.contains(i),
-          onToggle: () {
-            setState(() {
-              if (!_checkedIngredients.add(i)) {
-                _checkedIngredients.remove(i);
-              }
-            });
-          },
-          label: RichText(
-            text: TextSpan(
-              style: const TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 15.5,
-                height: 1.4,
-              ),
-              children: [
-                TextSpan(
-                  text: recipe.ingredients[i].name,
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                ),
-                if (recipe.ingredients[i].quantity.isNotEmpty)
-                  TextSpan(
-                    text: '  •  ${recipe.ingredients[i].quantity}',
-                    style: const TextStyle(
-                      color: AppColors.textSecondary,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ),
-    ];
-  }
-
-  List<Widget> _buildStepsList(Recipe recipe) {
-    if (recipe.steps.isEmpty) {
-      return const [
-        Text(
-          'No steps listed.',
-          style: TextStyle(color: AppColors.textSecondary),
-        ),
-      ];
-    }
-    return [
-      for (var i = 0; i < recipe.steps.length; i++)
-        ChecklistItem(
-          checked: _checkedSteps.contains(i),
-          leading: '${i + 1}.',
-          onToggle: () {
-            setState(() {
-              if (!_checkedSteps.add(i)) {
-                _checkedSteps.remove(i);
-              }
-            });
-          },
-          label: Text(recipe.steps[i]),
-        ),
-    ];
-  }
 }
+
+// ---------------------------------------------------------------------------
+// Header
 
 class _Header extends StatelessWidget {
   final Recipe recipe;
@@ -289,46 +202,104 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(14),
-          child: SizedBox(
-            width: 80,
-            height: 80,
-            child: _Thumb(url: recipe.thumbnailUrl),
-          ),
-        ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Column(
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                recipe.dishName,
-                style: const TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 23,
-                  fontWeight: FontWeight.w800,
-                  height: 1.2,
+              ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: SizedBox(
+                  width: 72,
+                  height: 72,
+                  child: _Thumb(url: recipe.thumbnailUrl),
                 ),
               ),
-              if (recipe.description.isNotEmpty) ...[
-                const SizedBox(height: 6),
-                Text(
-                  recipe.description,
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 13.5,
-                    height: 1.4,
-                  ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      recipe.dishName,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 21,
+                        fontWeight: FontWeight.w800,
+                        height: 1.2,
+                      ),
+                    ),
+                    if (recipe.description.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        recipe.description,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 13,
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
-              ],
+              ),
             ],
           ),
-        ),
-      ],
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              _Stat(
+                icon: Icons.schedule,
+                label: '${recipe.totalTimeMinutes} min',
+              ),
+              const SizedBox(width: 8),
+              _Stat(
+                icon: Icons.bar_chart,
+                label: difficultyLabel(recipe.difficulty),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Stat extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  const _Stat({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: AppColors.accent),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: const TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -355,42 +326,83 @@ class _Thumb extends StatelessWidget {
   }
 }
 
-class _OverviewBar extends StatelessWidget {
-  final Recipe recipe;
-  const _OverviewBar({required this.recipe});
+// ---------------------------------------------------------------------------
+// Servings selector
+
+class _ServingsSelector extends StatelessWidget {
+  final int current;
+  final int base;
+  final ValueChanged<int> onChange;
+
+  const _ServingsSelector({
+    required this.current,
+    required this.base,
+    required this.onChange,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 14),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
       ),
       child: Row(
         children: [
-          Expanded(
-            child: _Stat(
-              icon: Icons.schedule,
-              value: '${recipe.totalTimeMinutes}',
-              suffix: 'min',
+          const Icon(Icons.people_outline,
+              color: AppColors.accent, size: 20),
+          const SizedBox(width: 10),
+          const Text(
+            'Servings',
+            style: TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 14.5,
+              fontWeight: FontWeight.w600,
             ),
           ),
-          _VerticalDivider(),
-          Expanded(
-            child: _Stat(
-              icon: Icons.bar_chart,
-              value: difficultyLabel(recipe.difficulty),
-              suffix: '',
+          const Spacer(),
+          if (current != base)
+            Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child: TextButton(
+                onPressed: () => onChange(base),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.textSecondary,
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: const Text(
+                  'Reset',
+                  style:
+                      TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ),
+          _StepperButton(
+            icon: Icons.remove,
+            enabled: current > 1,
+            onTap: () => onChange(current - 1),
+          ),
+          SizedBox(
+            width: 38,
+            child: Center(
+              child: Text(
+                '$current',
+                style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
+                  fontFeatures: [FontFeature.tabularFigures()],
+                ),
+              ),
             ),
           ),
-          _VerticalDivider(),
-          Expanded(
-            child: _Stat(
-              icon: Icons.people_outline,
-              value: '${recipe.servings}',
-              suffix: 'servings',
-            ),
+          _StepperButton(
+            icon: Icons.add,
+            enabled: current < 99,
+            onTap: () => onChange(current + 1),
           ),
         ],
       ),
@@ -398,80 +410,222 @@ class _OverviewBar extends StatelessWidget {
   }
 }
 
-class _Stat extends StatelessWidget {
+class _StepperButton extends StatelessWidget {
   final IconData icon;
-  final String value;
-  final String suffix;
-  const _Stat(
-      {required this.icon, required this.value, required this.suffix});
+  final bool enabled;
+  final VoidCallback onTap;
+  const _StepperButton({
+    required this.icon,
+    required this.enabled,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Icon(icon, color: AppColors.accent, size: 20),
-        const SizedBox(height: 6),
-        Text(
-          value,
-          style: const TextStyle(
-            color: AppColors.textPrimary,
-            fontWeight: FontWeight.w700,
-            fontSize: 16,
+    return Material(
+      color: Colors.transparent,
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: enabled
+            ? () {
+                HapticFeedback.selectionClick();
+                onTap();
+              }
+            : null,
+        child: Container(
+          width: 34,
+          height: 34,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: enabled
+                ? AppColors.accent.withValues(alpha: 0.18)
+                : AppColors.surfaceElevated,
+          ),
+          child: Icon(
+            icon,
+            size: 18,
+            color: enabled ? AppColors.accent : AppColors.textTertiary,
           ),
         ),
-        if (suffix.isNotEmpty)
-          Text(
-            suffix,
-            style: const TextStyle(
-              color: AppColors.textTertiary,
-              fontSize: 11.5,
-            ),
-          ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Tab bar + tabs
+
+class _RecipeTabBar extends StatelessWidget {
+  const _RecipeTabBar();
+
+  @override
+  Widget build(BuildContext context) {
+    return const TabBar(
+      indicatorColor: AppColors.accent,
+      indicatorWeight: 3,
+      indicatorSize: TabBarIndicatorSize.label,
+      labelColor: AppColors.textPrimary,
+      unselectedLabelColor: AppColors.textTertiary,
+      labelStyle: TextStyle(
+        fontWeight: FontWeight.w700,
+        fontSize: 14,
+      ),
+      unselectedLabelStyle: TextStyle(
+        fontWeight: FontWeight.w600,
+        fontSize: 14,
+      ),
+      tabs: [
+        Tab(text: 'Ingredients'),
+        Tab(text: 'Steps'),
+        Tab(text: 'Tips'),
       ],
     );
   }
 }
 
-class _VerticalDivider extends StatelessWidget {
+class _IngredientsTab extends StatelessWidget {
+  final Recipe recipe;
+  final double ratio;
+  final Set<int> checked;
+  final ValueChanged<int> onToggle;
+
+  const _IngredientsTab({
+    required this.recipe,
+    required this.ratio,
+    required this.checked,
+    required this.onToggle,
+  });
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 1,
-      height: 36,
-      color: AppColors.divider,
+    if (recipe.ingredients.isEmpty) {
+      return _emptyTab('No ingredients listed.');
+    }
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+      itemCount: recipe.ingredients.length,
+      itemBuilder: (_, i) {
+        final ing = recipe.ingredients[i];
+        final scaled = QuantityScaler.scale(ing.quantity, ratio);
+        return ChecklistItem(
+          checked: checked.contains(i),
+          onToggle: () => onToggle(i),
+          label: RichText(
+            text: TextSpan(
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 15.5,
+                height: 1.4,
+              ),
+              children: [
+                TextSpan(
+                  text: ing.name,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                if (scaled.trim().isNotEmpty)
+                  TextSpan(
+                    text: '  •  $scaled',
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }
 
-class _SectionTitle extends StatelessWidget {
-  final String title;
-  final String? trailing;
-  const _SectionTitle({required this.title, this.trailing});
+class _StepsTab extends StatelessWidget {
+  final Recipe recipe;
+  final Set<int> checked;
+  final ValueChanged<int> onToggle;
+
+  const _StepsTab({
+    required this.recipe,
+    required this.checked,
+    required this.onToggle,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: Text(
-            title,
-            style: const TextStyle(
-              color: AppColors.textPrimary,
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ),
-        if (trailing != null)
-          Text(
-            trailing!,
-            style: const TextStyle(
-              color: AppColors.textTertiary,
-              fontSize: 12.5,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-      ],
+    if (recipe.steps.isEmpty) {
+      return _emptyTab('No steps listed.');
+    }
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+      itemCount: recipe.steps.length,
+      itemBuilder: (_, i) => ChecklistItem(
+        checked: checked.contains(i),
+        leading: '${i + 1}.',
+        onToggle: () => onToggle(i),
+        label: Text(recipe.steps[i]),
+      ),
     );
   }
+}
+
+class _TipsTab extends StatelessWidget {
+  final Recipe recipe;
+  const _TipsTab({required this.recipe});
+
+  @override
+  Widget build(BuildContext context) {
+    if (recipe.tips.isEmpty) {
+      return _emptyTab('No tips for this recipe.');
+    }
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+      itemCount: recipe.tips.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 10),
+      itemBuilder: (_, i) => Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: AppColors.accent.withValues(alpha: 0.25),
+          ),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(Icons.lightbulb_outline,
+                color: AppColors.accent, size: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                recipe.tips[i],
+                style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 14,
+                  height: 1.45,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+Widget _emptyTab(String text) {
+  return Center(
+    child: Padding(
+      padding: const EdgeInsets.all(32),
+      child: Text(
+        text,
+        textAlign: TextAlign.center,
+        style: const TextStyle(
+          color: AppColors.textSecondary,
+          fontSize: 14,
+        ),
+      ),
+    ),
+  );
 }
