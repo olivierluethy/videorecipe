@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -5,7 +7,9 @@ import 'package:share_plus/share_plus.dart';
 
 import '../models/recipe.dart';
 import '../providers/recipe_provider.dart';
+import '../providers/subscription_provider.dart';
 import '../services/clipboard_service.dart';
+import '../services/paywall_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/recipe_share.dart';
 import '../widgets/paste_button.dart';
@@ -60,7 +64,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     if (mounted) setState(() => _clipboardUrl = url);
   }
 
-  void _submit(String url) {
+  Future<void> _submit(String url) async {
+    // Hard gate: 3 lifetime free extractions for non-Pro users.
+    // Counter is monotonic — deleting recipes never unlocks a 4th attempt.
+    final isPro = ref.read(isProProvider);
+    final used = ref.read(extractionCounterProvider);
+    if (!isPro && used >= 3) {
+      await ref
+          .read(paywallServiceProvider)
+          .presentIfNeeded(context, source: 'extraction_gate');
+      // Re-check after the paywall closes; if Pro now, proceed.
+      if (!ref.read(isProProvider)) return;
+    }
+
+    if (!mounted) return;
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => LoadingScreen(youtubeUrl: url),
@@ -177,7 +194,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       );
       return;
     }
-    _submit(url);
+    await _submit(url);
   }
 
   @override
@@ -244,7 +261,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     clipboardUrl: _clipboardUrl,
                     onPasteFromClipboard: () {
                       HapticFeedback.selectionClick();
-                      _submit(_clipboardUrl!);
+                      unawaited(_submit(_clipboardUrl!));
                     },
                     onManualEntry: _showManualEntry,
                   ),

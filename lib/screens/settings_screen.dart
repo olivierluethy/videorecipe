@@ -1,7 +1,10 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers/recipe_provider.dart';
+import '../providers/subscription_provider.dart';
+import '../services/paywall_service.dart';
 import '../theme/app_theme.dart';
 
 class SettingsScreen extends ConsumerWidget {
@@ -42,12 +45,54 @@ class SettingsScreen extends ConsumerWidget {
     final autoDetect = ref.watch(clipboardAutoDetectProvider);
     final recipeCount = ref.watch(recipesProvider).length;
     final storage = ref.read(storageServiceProvider);
+    final isPro = ref.watch(isProProvider);
+    final paywall = ref.read(paywallServiceProvider);
+    final extractionsUsed = ref.watch(extractionCounterProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         children: [
+          _Section(
+            title: 'Subscription',
+            child: Column(
+              children: [
+                if (isPro)
+                  _SettingsTile(
+                    title: 'Manage subscription',
+                    subtitle:
+                        'Change plan, cancel, or get help with your purchase.',
+                    trailing: const Icon(Icons.chevron_right,
+                        color: AppColors.textTertiary),
+                    onTap: () => paywall.presentCustomerCenter(context),
+                  )
+                else ...[
+                  _SettingsTile(
+                    title: 'Upgrade to Pro',
+                    subtitle:
+                        'Unlock unlimited recipe extractions. ${(3 - extractionsUsed).clamp(0, 3)} free left.',
+                    trailing: const Icon(Icons.chevron_right,
+                        color: AppColors.accent),
+                    onTap: () => paywall.presentIfNeeded(
+                      context,
+                      source: 'settings_upgrade',
+                    ),
+                  ),
+                  const Divider(height: 1, color: AppColors.divider),
+                  _SettingsTile(
+                    title: 'Restore Purchases',
+                    subtitle:
+                        'Re-link a purchase you made on another device or after reinstalling.',
+                    trailing: const Icon(Icons.refresh,
+                        color: AppColors.textTertiary),
+                    onTap: () => paywall.restorePurchases(context),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
           _Section(
             title: 'Behavior',
             child: _SettingsTile(
@@ -117,6 +162,31 @@ class SettingsScreen extends ConsumerWidget {
               ),
             ),
           ),
+          if (kDebugMode) ...[
+            const SizedBox(height: 18),
+            _Section(
+              title: 'Debug',
+              child: _SettingsTile(
+                title: 'Reset extraction counter',
+                subtitle:
+                    'Currently $extractionsUsed of 3 used. Visible only in debug builds.',
+                trailing: TextButton(
+                  onPressed: () async {
+                    await ref
+                        .read(extractionCounterProvider.notifier)
+                        .debugReset();
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Counter reset to 0.')),
+                    );
+                  },
+                  style: TextButton.styleFrom(
+                      foregroundColor: AppColors.accent),
+                  child: const Text('Reset'),
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 30),
         ],
       ),
@@ -162,11 +232,17 @@ class _SettingsTile extends StatelessWidget {
   final String title;
   final String? subtitle;
   final Widget? trailing;
-  const _SettingsTile({required this.title, this.subtitle, this.trailing});
+  final VoidCallback? onTap;
+  const _SettingsTile({
+    required this.title,
+    this.subtitle,
+    this.trailing,
+    this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    final content = Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
@@ -200,6 +276,13 @@ class _SettingsTile extends StatelessWidget {
           if (trailing != null) trailing!,
         ],
       ),
+    );
+
+    if (onTap == null) return content;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: content,
     );
   }
 }

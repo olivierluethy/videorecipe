@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.videorecipe"
+    namespace = "com.dishextract.app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -21,11 +21,12 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.videorecipe"
+        applicationId = "com.dishextract.app"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        // flutter_secure_storage 9.x requires minSdk 23.
-        minSdk = flutter.minSdkVersion
+        // RevenueCat purchases_flutter 9.x requires minSdk 23. Pin explicitly
+        // so a future Flutter SDK update can't lower the floor under us.
+        minSdk = maxOf(flutter.minSdkVersion, 23)
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName

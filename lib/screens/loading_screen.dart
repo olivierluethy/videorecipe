@@ -5,6 +5,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers/recipe_provider.dart';
+import '../providers/subscription_provider.dart';
 import '../services/backend_service.dart';
 import '../services/youtube_transcript_service.dart';
 import '../theme/app_theme.dart';
@@ -71,6 +72,11 @@ class _LoadingScreenState extends ConsumerState<LoadingScreen> {
       );
 
       await ref.read(recipesProvider.notifier).add(recipe);
+
+      // Persist the lifetime counter increment BEFORE the navigation delay so
+      // a crash mid-transition can't lose it. Pro users still increment — the
+      // gate only reads the counter when !isPro, so it's harmless.
+      await ref.read(extractionCounterProvider.notifier).increment();
 
       if (!mounted) return;
       _stopTimers();

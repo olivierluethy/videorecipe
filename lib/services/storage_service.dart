@@ -8,6 +8,7 @@ class StorageService {
 
   static const String _kClipboardAutoDetect = 'clipboardAutoDetect';
   static const String _kHasSeenOnboarding = 'hasSeenOnboarding';
+  static const String _kFreeExtractionsUsed = 'freeExtractionsUsed';
 
   late final Box<String> _recipeBox;
   late final Box _settingsBox;
@@ -58,4 +59,19 @@ class StorageService {
 
   Future<void> setHasSeenOnboarding(bool value) =>
       _settingsBox.put(_kHasSeenOnboarding, value);
+
+  // --- Lifetime free-extraction counter ---
+  // Monotonically increasing. Never decrements on delete/clearAll/reinstall recovery.
+
+  int get freeExtractionsUsed =>
+      _settingsBox.get(_kFreeExtractionsUsed, defaultValue: 0) as int;
+
+  Future<void> incrementFreeExtractionsUsed() async {
+    final current = freeExtractionsUsed;
+    await _settingsBox.put(_kFreeExtractionsUsed, current + 1);
+  }
+
+  // Debug-only: lets the test-mode toggle reset to 0 without reinstalling.
+  Future<void> resetFreeExtractionsUsed() =>
+      _settingsBox.put(_kFreeExtractionsUsed, 0);
 }
