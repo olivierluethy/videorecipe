@@ -20,6 +20,12 @@ class PaywallScreen extends ConsumerStatefulWidget {
   ConsumerState<PaywallScreen> createState() => _PaywallScreenState();
 }
 
+/// True when the active layout should use the spacious tablet variant.
+/// iPad portrait is 768pt wide, iPad mini 744 — anything ≥600 gets the
+/// roomier sizing.
+bool _isTablet(BuildContext context) =>
+    MediaQuery.sizeOf(context).width >= 600;
+
 class _PaywallScreenState extends ConsumerState<PaywallScreen> {
   bool _purchasing = false;
   String? _selectedPackageId;
@@ -32,15 +38,24 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
 
     final packages = _orderedPackages(offerings);
     final selected = _resolveSelection(packages);
+    final isTablet = _isTablet(context);
+
+    final outerHorizontalPad = isTablet ? 32.0 : 20.0;
+    final sectionGap = isTablet ? 24.0 : 14.0;
+    final ctaTopGap = isTablet ? 18.0 : 12.0;
 
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.background,
         elevation: 0,
-        toolbarHeight: 48,
+        toolbarHeight: isTablet ? 56 : 48,
         leading: IconButton(
-          icon: const Icon(Icons.close, color: AppColors.textPrimary),
+          icon: Icon(
+            Icons.close,
+            color: AppColors.textPrimary,
+            size: isTablet ? 28 : 24,
+          ),
           onPressed: () => Navigator.of(context).maybePop(),
         ),
       ),
@@ -57,59 +72,72 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
                 // of failing layout.
                 constraints:
                     BoxConstraints(minHeight: constraints.maxHeight),
-                child: IntrinsicHeight(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        const _Hero(),
-                        const SizedBox(height: 14),
-                        const _BenefitsGrid(),
-                        const SizedBox(height: 14),
-                        const _TestimonialsSection(),
-                        const SizedBox(height: 14),
-                        if (status == OfferingsStatus.loading)
-                          const _LoadingState()
-                        else if (offerings == null || packages.isEmpty)
-                          _UnavailableState(
-                            onRetry: () async {
-                              await ref
-                                  .read(subscriptionServiceProvider)
-                                  .refreshOfferings();
-                              // The screen rebuilds via the
-                              // offeringsStatusProvider watch above; nothing
-                              // else to do — if offerings are now loaded
-                              // the plan list and CTA take over.
-                            },
-                          )
-                        else ...[
-                          _PlanList(
-                            packages: packages,
-                            selectedId: selected?.identifier,
-                            disabled: _purchasing,
-                            onSelect: (pkg) {
-                              HapticFeedback.selectionClick();
-                              setState(() =>
-                                  _selectedPackageId = pkg.identifier);
-                            },
-                          ),
-                          const SizedBox(height: 12),
-                          _ContinueButton(
-                            enabled: selected != null && !_purchasing,
-                            loading: _purchasing,
-                            label: _ctaLabelFor(selected),
-                            onPressed: () {
-                              if (selected != null) _handlePurchase(selected);
-                            },
-                          ),
-                        ],
-                        const Spacer(),
-                        _Footer(
-                          disabled: _purchasing,
-                          onRestore: _handleRestore,
+                child: Center(
+                  child: ConstrainedBox(
+                    // Keep the content readable on wide tablets — without a
+                    // max width the cards stretch edge-to-edge and look
+                    // sparse.
+                    constraints: BoxConstraints(
+                      maxWidth: isTablet ? 640 : double.infinity,
+                    ),
+                    child: IntrinsicHeight(
+                      child: Padding(
+                        padding: EdgeInsets.fromLTRB(
+                          outerHorizontalPad,
+                          0,
+                          outerHorizontalPad,
+                          isTablet ? 18 : 10,
                         ),
-                      ],
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            const _Hero(),
+                            SizedBox(height: sectionGap),
+                            const _BenefitsGrid(),
+                            SizedBox(height: sectionGap),
+                            const _TestimonialsSection(),
+                            SizedBox(height: sectionGap),
+                            if (status == OfferingsStatus.loading)
+                              const _LoadingState()
+                            else if (offerings == null || packages.isEmpty)
+                              _UnavailableState(
+                                onRetry: () async {
+                                  await ref
+                                      .read(subscriptionServiceProvider)
+                                      .refreshOfferings();
+                                },
+                              )
+                            else ...[
+                              _PlanList(
+                                packages: packages,
+                                selectedId: selected?.identifier,
+                                disabled: _purchasing,
+                                onSelect: (pkg) {
+                                  HapticFeedback.selectionClick();
+                                  setState(() =>
+                                      _selectedPackageId = pkg.identifier);
+                                },
+                              ),
+                              SizedBox(height: ctaTopGap),
+                              _ContinueButton(
+                                enabled: selected != null && !_purchasing,
+                                loading: _purchasing,
+                                label: _ctaLabelFor(selected),
+                                onPressed: () {
+                                  if (selected != null) {
+                                    _handlePurchase(selected);
+                                  }
+                                },
+                              ),
+                            ],
+                            const Spacer(),
+                            _Footer(
+                              disabled: _purchasing,
+                              onRestore: _handleRestore,
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -217,27 +245,34 @@ class _Hero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isTablet = _isTablet(context);
+    final iconBox = isTablet ? 64.0 : 46.0;
+    final iconSize = isTablet ? 34.0 : 24.0;
+    final titleSize = isTablet ? 28.0 : 20.0;
+    final subtitleSize = isTablet ? 15.0 : 12.5;
+    final gap = isTablet ? 18.0 : 12.0;
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Container(
-          width: 46,
-          height: 46,
+          width: iconBox,
+          height: iconBox,
           decoration: BoxDecoration(
             color: AppColors.accent.withValues(alpha: 0.18),
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(isTablet ? 18 : 14),
             border: Border.all(
               color: AppColors.accent.withValues(alpha: 0.45),
               width: 1.5,
             ),
           ),
-          child: const Icon(
+          child: Icon(
             Icons.restaurant_menu,
             color: AppColors.accent,
-            size: 24,
+            size: iconSize,
           ),
         ),
-        const SizedBox(width: 12),
+        SizedBox(width: gap),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -247,18 +282,18 @@ class _Hero extends StatelessWidget {
                 'Unlock DishExtract Pro',
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.w800,
-                      fontSize: 20,
+                      fontSize: titleSize,
                       height: 1.15,
                     ),
               ),
-              const SizedBox(height: 2),
-              const Text(
+              SizedBox(height: isTablet ? 4 : 2),
+              Text(
                 'Turn any cooking video into a clean, structured recipe.',
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   color: AppColors.textSecondary,
-                  fontSize: 12.5,
+                  fontSize: subtitleSize,
                   height: 1.3,
                 ),
               ),
@@ -302,25 +337,25 @@ class _BenefitsGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // No `CrossAxisAlignment.stretch` here: stretch on a Row inside an
-    // IntrinsicHeight ancestor creates a circular height dependency that
-    // throws "RenderBox was not laid out". The tiles are matched in height
-    // by their identical content shape (icon + 1-line title + 2-line capped
-    // subtitle), so visually they already line up.
+    final isTablet = _isTablet(context);
+    final gap = isTablet ? 12.0 : 8.0;
+
+    // No `CrossAxisAlignment.stretch` on the rows: stretch on a Row inside
+    // an IntrinsicHeight ancestor creates a circular height dependency.
     return Column(
       children: [
         Row(
           children: [
             Expanded(child: _BenefitTile(benefit: _benefits[0])),
-            const SizedBox(width: 8),
+            SizedBox(width: gap),
             Expanded(child: _BenefitTile(benefit: _benefits[1])),
           ],
         ),
-        const SizedBox(height: 8),
+        SizedBox(height: gap),
         Row(
           children: [
             Expanded(child: _BenefitTile(benefit: _benefits[2])),
-            const SizedBox(width: 8),
+            SizedBox(width: gap),
             Expanded(child: _BenefitTile(benefit: _benefits[3])),
           ],
         ),
@@ -346,26 +381,38 @@ class _BenefitTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isTablet = _isTablet(context);
+    final hPad = isTablet ? 16.0 : 12.0;
+    final vPad = isTablet ? 14.0 : 10.0;
+    final iconBox = isTablet ? 38.0 : 28.0;
+    final iconSize = isTablet ? 22.0 : 16.0;
+    final titleSize = isTablet ? 14.5 : 12.5;
+    final subtitleSize = isTablet ? 13.0 : 11.0;
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(isTablet ? 16 : 14),
         border: Border.all(color: AppColors.divider, width: 1),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            width: 28,
-            height: 28,
+            width: iconBox,
+            height: iconBox,
             decoration: BoxDecoration(
               color: AppColors.accent.withValues(alpha: 0.18),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(isTablet ? 10 : 8),
             ),
-            child: Icon(benefit.icon, color: AppColors.accent, size: 16),
+            child: Icon(
+              benefit.icon,
+              color: AppColors.accent,
+              size: iconSize,
+            ),
           ),
-          const SizedBox(width: 8),
+          SizedBox(width: isTablet ? 12 : 8),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -375,22 +422,22 @@ class _BenefitTile extends StatelessWidget {
                   benefit.title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.textPrimary,
-                    fontSize: 12.5,
+                    fontSize: titleSize,
                     fontWeight: FontWeight.w700,
                     height: 1.2,
                   ),
                 ),
-                const SizedBox(height: 2),
+                SizedBox(height: isTablet ? 4 : 2),
                 Text(
                   benefit.subtitle,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.textSecondary,
-                    fontSize: 11,
-                    height: 1.25,
+                    fontSize: subtitleSize,
+                    height: 1.3,
                   ),
                 ),
               ],
@@ -403,7 +450,7 @@ class _BenefitTile extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Testimonials — slim horizontal scroll, retains 5-star + quote + author
+// Testimonials — horizontal scroll, retains 5-star + quote + author
 // ---------------------------------------------------------------------------
 
 class _TestimonialsSection extends StatelessWidget {
@@ -429,28 +476,34 @@ class _TestimonialsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isTablet = _isTablet(context);
+    final headerSize = isTablet ? 16.0 : 13.0;
+    final cardHeight = isTablet ? 130.0 : 92.0;
+    final cardGap = isTablet ? 12.0 : 8.0;
+    final headerBottomGap = isTablet ? 10.0 : 6.0;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
-          padding: EdgeInsets.only(left: 2, bottom: 6),
+        Padding(
+          padding: EdgeInsets.only(left: 2, bottom: headerBottomGap),
           child: Text(
             'Loved by home cooks',
             style: TextStyle(
               color: AppColors.textPrimary,
-              fontSize: 13,
+              fontSize: headerSize,
               fontWeight: FontWeight.w700,
             ),
           ),
         ),
         SizedBox(
-          height: 92,
+          height: cardHeight,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             physics: const BouncingScrollPhysics(),
             padding: const EdgeInsets.symmetric(horizontal: 2),
             itemCount: _quotes.length,
-            separatorBuilder: (_, _) => const SizedBox(width: 8),
+            separatorBuilder: (_, _) => SizedBox(width: cardGap),
             itemBuilder: (_, i) => _TestimonialCard(quote: _quotes[i]),
           ),
         ),
@@ -471,12 +524,20 @@ class _TestimonialCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isTablet = _isTablet(context);
+    final width = isTablet ? 300.0 : 230.0;
+    final hPad = isTablet ? 16.0 : 12.0;
+    final vPad = isTablet ? 14.0 : 10.0;
+    final starSize = isTablet ? 16.0 : 13.0;
+    final quoteSize = isTablet ? 13.5 : 11.5;
+    final authorSize = isTablet ? 12.5 : 10.5;
+
     return Container(
-      width: 230,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      width: width,
+      padding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(isTablet ? 14 : 12),
         border: Border.all(color: AppColors.divider, width: 1),
       ),
       child: Column(
@@ -485,31 +546,34 @@ class _TestimonialCard extends StatelessWidget {
           Row(
             children: List.generate(
               5,
-              (_) => const Padding(
-                padding: EdgeInsets.only(right: 1),
-                child: Icon(Icons.star_rounded,
-                    color: AppColors.accent, size: 13),
+              (_) => Padding(
+                padding: const EdgeInsets.only(right: 1),
+                child: Icon(
+                  Icons.star_rounded,
+                  color: AppColors.accent,
+                  size: starSize,
+                ),
               ),
             ),
           ),
-          const SizedBox(height: 6),
+          SizedBox(height: isTablet ? 8 : 6),
           Expanded(
             child: Text(
               quote.quote,
-              maxLines: 2,
+              maxLines: isTablet ? 3 : 2,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.textPrimary,
-                fontSize: 11.5,
-                height: 1.3,
+                fontSize: quoteSize,
+                height: 1.35,
               ),
             ),
           ),
           Text(
             quote.author,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.textSecondary,
-              fontSize: 10.5,
+              fontSize: authorSize,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -542,8 +606,9 @@ class _UnavailableState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isTablet = _isTablet(context);
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(isTablet ? 28 : 20),
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(18),
@@ -552,28 +617,31 @@ class _UnavailableState extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.cloud_off,
-              color: AppColors.textTertiary, size: 36),
-          const SizedBox(height: 12),
-          const Text(
+          Icon(
+            Icons.cloud_off,
+            color: AppColors.textTertiary,
+            size: isTablet ? 48 : 36,
+          ),
+          SizedBox(height: isTablet ? 16 : 12),
+          Text(
             'Subscriptions unavailable',
             style: TextStyle(
               color: AppColors.textPrimary,
-              fontSize: 16,
+              fontSize: isTablet ? 19 : 16,
               fontWeight: FontWeight.w700,
             ),
           ),
-          const SizedBox(height: 6),
-          const Text(
+          SizedBox(height: isTablet ? 8 : 6),
+          Text(
             'Check your connection and try again.',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: AppColors.textSecondary,
-              fontSize: 13.5,
+              fontSize: isTablet ? 15 : 13.5,
               height: 1.4,
             ),
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: isTablet ? 22 : 16),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
@@ -606,6 +674,9 @@ class _PlanList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isTablet = _isTablet(context);
+    final gap = isTablet ? 12.0 : 8.0;
+
     final weekly = packages
         .where((p) => p.packageType == PackageType.weekly)
         .firstOrNull;
@@ -620,7 +691,7 @@ class _PlanList extends StatelessWidget {
             weeklyReference: weekly,
             onTap: () => onSelect(packages[i]),
           ),
-          if (i != packages.length - 1) const SizedBox(height: 8),
+          if (i != packages.length - 1) SizedBox(height: gap),
         ],
       ],
     );
@@ -644,6 +715,16 @@ class _PlanCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isTablet = _isTablet(context);
+    final hPad = isTablet ? 18.0 : 14.0;
+    final vPad = isTablet ? 16.0 : 10.0;
+    final radius = isTablet ? 16.0 : 14.0;
+    final titleSize = isTablet ? 17.0 : 15.0;
+    final sublabelSize = isTablet ? 13.0 : 11.5;
+    final priceSize = isTablet ? 17.0 : 15.0;
+    final cadenceSize = isTablet ? 12.5 : 10.5;
+    final dotGap = isTablet ? 16.0 : 12.0;
+
     final product = package.storeProduct;
     final title = _titleFor(package);
     final cadence = _cadenceFor(package);
@@ -658,16 +739,16 @@ class _PlanCard extends StatelessWidget {
 
     return Material(
       color: Colors.transparent,
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(radius),
       child: InkWell(
         onTap: disabled ? null : onTap,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(radius),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          padding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
           decoration: BoxDecoration(
             color: bgColor,
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(radius),
             border: Border.all(
               color: borderColor,
               width: selected ? 1.5 : 1,
@@ -676,7 +757,7 @@ class _PlanCard extends StatelessWidget {
           child: Row(
             children: [
               _RadioDot(selected: selected),
-              const SizedBox(width: 12),
+              SizedBox(width: dotGap),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -688,28 +769,28 @@ class _PlanCard extends StatelessWidget {
                           child: Text(
                             title,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
+                            style: TextStyle(
                               color: AppColors.textPrimary,
-                              fontSize: 15,
+                              fontSize: titleSize,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
                         ),
                         if (badge != null) ...[
-                          const SizedBox(width: 6),
+                          SizedBox(width: isTablet ? 8 : 6),
                           _Badge(text: badge),
                         ],
                       ],
                     ),
                     if (sublabel != null) ...[
-                      const SizedBox(height: 2),
+                      SizedBox(height: isTablet ? 4 : 2),
                       Text(
                         sublabel,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: AppColors.textSecondary,
-                          fontSize: 11.5,
+                          fontSize: sublabelSize,
                           height: 1.25,
                         ),
                       ),
@@ -717,24 +798,24 @@ class _PlanCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(width: 10),
+              SizedBox(width: isTablet ? 14 : 10),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
                     product.priceString,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.textPrimary,
-                      fontSize: 15,
+                      fontSize: priceSize,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
                   Text(
                     cadence,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.textSecondary,
-                      fontSize: 10.5,
+                      fontSize: cadenceSize,
                     ),
                   ),
                 ],
@@ -834,10 +915,14 @@ class _RadioDot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isTablet = _isTablet(context);
+    final size = isTablet ? 24.0 : 20.0;
+    final checkSize = isTablet ? 14.0 : 12.0;
+
     return AnimatedContainer(
       duration: const Duration(milliseconds: 180),
-      width: 20,
-      height: 20,
+      width: size,
+      height: size,
       decoration: BoxDecoration(
         color: selected ? AppColors.accent : Colors.transparent,
         shape: BoxShape.circle,
@@ -847,7 +932,7 @@ class _RadioDot extends StatelessWidget {
         ),
       ),
       child: selected
-          ? const Icon(Icons.check, color: Colors.black, size: 12)
+          ? Icon(Icons.check, color: Colors.black, size: checkSize)
           : null,
     );
   }
@@ -862,17 +947,21 @@ class _Badge extends StatelessWidget {
   const _Badge({required this.text});
   @override
   Widget build(BuildContext context) {
+    final isTablet = _isTablet(context);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      padding: EdgeInsets.symmetric(
+        horizontal: isTablet ? 9 : 7,
+        vertical: isTablet ? 3 : 2,
+      ),
       decoration: BoxDecoration(
         color: AppColors.accent.withValues(alpha: 0.18),
-        borderRadius: BorderRadius.circular(7),
+        borderRadius: BorderRadius.circular(isTablet ? 8 : 7),
       ),
       child: Text(
         text,
-        style: const TextStyle(
+        style: TextStyle(
           color: AppColors.accent,
-          fontSize: 10.5,
+          fontSize: isTablet ? 12 : 10.5,
           fontWeight: FontWeight.w700,
           letterSpacing: 0.3,
         ),
@@ -900,9 +989,19 @@ class _ContinueButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isTablet = _isTablet(context);
+    final height = isTablet ? 60.0 : 50.0;
+    final fontSize = isTablet ? 17.5 : 15.5;
+    final radius = isTablet ? 18.0 : 16.0;
+    // Generous explicit horizontal padding so the text is never crowded by
+    // the button edge, and FittedBox below auto-shrinks the label if a
+    // longer translation ever pushes it past the available width — that's
+    // what was clipping "Start weekly plan" before.
+    final hPad = isTablet ? 28.0 : 20.0;
+
     return SizedBox(
       width: double.infinity,
-      height: 50,
+      height: height,
       child: ElevatedButton(
         onPressed: enabled ? onPressed : null,
         style: ElevatedButton.styleFrom(
@@ -911,24 +1010,30 @@ class _ContinueButton extends StatelessWidget {
               AppColors.accent.withValues(alpha: 0.4),
           foregroundColor: Colors.black,
           elevation: 0,
+          padding: EdgeInsets.symmetric(horizontal: hPad),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(radius),
           ),
         ),
         child: loading
-            ? const SizedBox(
-                width: 22,
-                height: 22,
-                child: CircularProgressIndicator(
+            ? SizedBox(
+                width: isTablet ? 26 : 22,
+                height: isTablet ? 26 : 22,
+                child: const CircularProgressIndicator(
                   color: Colors.black,
                   strokeWidth: 2.4,
                 ),
               )
-            : Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 15.5,
-                  fontWeight: FontWeight.w700,
+            : FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  softWrap: false,
+                  style: TextStyle(
+                    fontSize: fontSize,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
       ),
@@ -947,17 +1052,18 @@ class _Footer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isTablet = _isTablet(context);
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 8),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
           child: Text(
             'Auto-renews until cancelled. Cancel anytime in account settings.',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: AppColors.textTertiary,
-              fontSize: 10.5,
+              fontSize: isTablet ? 12 : 10.5,
               height: 1.3,
             ),
           ),
@@ -1006,14 +1112,15 @@ class _LinkButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isTablet = _isTablet(context);
     return TextButton(
       onPressed: onPressed,
       style: TextButton.styleFrom(
         foregroundColor: AppColors.textSecondary,
-        textStyle: const TextStyle(fontSize: 12),
-        minimumSize: const Size(0, 32),
+        textStyle: TextStyle(fontSize: isTablet ? 13.5 : 12),
+        minimumSize: Size(0, isTablet ? 36 : 32),
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        padding: const EdgeInsets.symmetric(horizontal: 8),
+        padding: EdgeInsets.symmetric(horizontal: isTablet ? 10 : 8),
       ),
       child: Text(label),
     );
