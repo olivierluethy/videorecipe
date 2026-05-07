@@ -3,22 +3,20 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:purchases_ui_flutter/purchases_ui_flutter.dart';
 
-import '../config/revenuecat_config.dart';
 import '../providers/subscription_provider.dart';
 import '../screens/paywall_screen.dart';
-import '../theme/app_theme.dart';
 import 'subscription_service.dart';
 
 /// Single entry point for showing the paywall.
 ///
 /// Flow:
-/// 1. If the user already has the Pro entitlement, no-op (the
-///    `presentPaywallIfNeeded` API also enforces this server-side).
-/// 2. If `offeringsStatus == unavailable`, show the fallback custom paywall
-///    so the user sees something other than a blank screen.
-/// 3. Otherwise present the RevenueCat dashboard paywall. If that throws,
-///    surface a retry snackbar — never silently swap to the custom paywall,
-///    so dashboard config bugs don't get masked.
+/// 1. If the user already has the Pro entitlement, no-op.
+/// 2. Try to refresh offerings (best-effort; the screen also renders an
+///    unavailable state if this fails).
+/// 3. Always present the custom Flutter [PaywallScreen] so Android and iOS
+///    users see the same UI. The RevenueCat dashboard paywall is no longer
+///    used — it rendered a different (RC-hosted) layout on iOS than the
+///    Flutter fallback on Android.
 class PaywallService {
   PaywallService(this._ref);
 
@@ -33,45 +31,16 @@ class PaywallService {
     if (service.isPro) return;
 
     if (!service.hasCurrentOffering) {
-      // Try one refresh first — covers the cold-start case where init() is
-      // still in flight or the first attempt failed transiently.
+      // Best-effort warmup so the screen opens with plan data already
+      // populated; it will still render and self-retry if this fails.
       await service.refreshOfferings();
     }
 
-    if (!service.hasCurrentOffering) {
-      if (!context.mounted) return;
-      await Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => PaywallScreen(source: source),
-          fullscreenDialog: true,
-        ),
-      );
-      return;
-    }
-
-    try {
-      await RevenueCatUI.presentPaywallIfNeeded(
-        RcConfig.kProEntitlementId,
-        displayCloseButton: true,
-      );
-    } on PlatformException {
-      if (!context.mounted) return;
-      _showRetrySnackBar(context, source);
-    } catch (_) {
-      if (!context.mounted) return;
-      _showRetrySnackBar(context, source);
-    }
-  }
-
-  void _showRetrySnackBar(BuildContext context, String source) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('Couldn\'t open the paywall. Please try again.'),
-        action: SnackBarAction(
-          label: 'Retry',
-          textColor: AppColors.accent,
-          onPressed: () => presentIfNeeded(context, source: source),
-        ),
+    if (!context.mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => PaywallScreen(source: source),
+        fullscreenDialog: true,
       ),
     );
   }

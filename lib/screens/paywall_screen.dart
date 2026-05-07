@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
-import 'package:purchases_ui_flutter/purchases_ui_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../config/revenuecat_config.dart';
@@ -10,9 +9,9 @@ import '../providers/subscription_provider.dart';
 import '../services/subscription_service.dart';
 import '../theme/app_theme.dart';
 
-/// Fallback paywall, rendered ONLY when `getOfferings` returned null or
-/// threw (e.g. no network on first launch). The primary paywall is the
-/// RevenueCat dashboard one.
+/// Custom paywall used on both Android and iOS so the experience is
+/// identical across platforms. When `getOfferings` fails (no network,
+/// invalid SDK key) the screen renders an unavailable state with retry.
 class PaywallScreen extends ConsumerStatefulWidget {
   final String source;
   const PaywallScreen({super.key, required this.source});
@@ -78,17 +77,10 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
                               await ref
                                   .read(subscriptionServiceProvider)
                                   .refreshOfferings();
-                              if (!mounted) return;
-                              final svc =
-                                  ref.read(subscriptionServiceProvider);
-                              if (!mounted) return;
-                              if (svc.hasCurrentOffering) {
-                                Navigator.of(context).pop();
-                                await RevenueCatUI.presentPaywallIfNeeded(
-                                  RcConfig.kProEntitlementId,
-                                  displayCloseButton: true,
-                                );
-                              }
+                              // The screen rebuilds via the
+                              // offeringsStatusProvider watch above; nothing
+                              // else to do — if offerings are now loaded
+                              // the plan list and CTA take over.
                             },
                           )
                         else ...[
