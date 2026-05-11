@@ -21,6 +21,6 @@ class RcConfig {
   // Placeholder URLs for the fallback paywall's Terms / Privacy footer.
   // Required by App Store review — swap these for real published URLs
   // before TestFlight.
-  static const String kTermsUrl = 'https://dishextract.app/terms';
-  static const String kPrivacyUrl = 'https://dishextract.app/privacy';
+  static const String kTermsUrl = 'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/';
+  static const String kPrivacyUrl = 'https://flickclean.app/privacy';
 }
