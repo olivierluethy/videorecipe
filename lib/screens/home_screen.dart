@@ -158,7 +158,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 autofocus: true,
                 style: const TextStyle(color: AppColors.textPrimary),
                 decoration: InputDecoration(
-                  hintText: 'https://youtube.com/...',
+                  hintText: 'e.g. youtube.com/watch?v=…',
+                  helperText: 'https:// is optional',
+                  helperStyle: const TextStyle(color: AppColors.textTertiary),
                   fillColor: AppColors.surfaceElevated,
                   filled: true,
                   border: OutlineInputBorder(
@@ -190,7 +192,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     if (url == null) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('That doesn\'t look like a YouTube URL.')),
+        const SnackBar(
+          content: Text(
+            'Enter a YouTube video link, e.g. youtube.com/watch?v=… '
+            '(typing https:// is optional).',
+          ),
+        ),
       );
       return;
     }
