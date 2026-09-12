@@ -1,17 +1,35 @@
 # videorecipe
 
-A new Flutter project.
+Extract structured recipes from YouTube cooking videos. Paste a video, and the app pulls its transcript, sends it to a small backend, and hands you a clean recipe — ingredients, steps, timing and tips — instead of scrubbing through the video.
 
-## Getting Started
+## How it works
 
-This project is a starting point for a Flutter application.
+1. The **Flutter** app fetches the transcript of a YouTube cooking video (`youtube_explode_dart`).
+2. It posts the transcript to the **PHP backend**, a thin proxy that keeps the Anthropic API key server-side.
+3. The backend asks **Anthropic Claude** to turn the transcript into structured recipe JSON (dish name, ingredients, steps, difficulty, servings, tips).
+4. The app renders the recipe and caches it locally (Hive).
 
-A few resources to get you started if this is your first Flutter project:
+## Tech
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+- **App:** Flutter / Dart, Riverpod (state), Dio (networking), Hive (local storage), RevenueCat (`purchases_flutter`) for subscriptions. Targets iOS and Android.
+- **Backend:** PHP proxy exposing `POST /api/extract-recipe` and `GET /api/health`, with CORS, rate limiting, transcript-size caps and Anthropic Claude integration. See [`backend/README.md`](backend/README.md).
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Run
+
+### App
+
+```bash
+flutter pub get
+flutter run
+```
+
+### Backend
+
+```bash
+cd backend
+composer install
+cp .env.example .env       # add your ANTHROPIC_API_KEY
+php -S localhost:8000 -t public
+```
+
+Point the app at the backend URL, then open a YouTube cooking video to extract its recipe.
