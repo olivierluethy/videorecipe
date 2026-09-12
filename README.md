@@ -1,4 +1,17 @@
-# videorecipe
+<div align="center">
+  <img src="android/app/src/main/res/mipmap-xxxhdpi/launcher_icon.png" alt="videorecipe logo" width="140" />
+  <h1>videorecipe</h1>
+  <p><b>Turn any YouTube cooking video into a clean, structured recipe.</b><br/>A Flutter app that pulls a video's transcript and uses Claude to extract ingredients, steps, timing and tips — no more scrubbing through the video.</p>
+  <p>
+    <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-blue.svg"></a>
+    <img alt="Flutter" src="https://img.shields.io/badge/Flutter-02569B?logo=flutter&logoColor=white">
+    <img alt="Dart" src="https://img.shields.io/badge/Dart-0175C2?logo=dart&logoColor=white">
+    <img alt="PHP" src="https://img.shields.io/badge/PHP-777BB4?logo=php&logoColor=white">
+    <img alt="Anthropic Claude" src="https://img.shields.io/badge/Anthropic_Claude-D97757?logo=anthropic&logoColor=white">
+  </p>
+</div>
+
+---
 
 Extract structured recipes from YouTube cooking videos. Paste a video, and the app pulls its transcript, sends it to a small backend, and hands you a clean recipe — ingredients, steps, timing and tips — instead of scrubbing through the video.
 
@@ -33,3 +46,12 @@ php -S localhost:8000 -t public
 ```
 
 Point the app at the backend URL, then open a YouTube cooking video to extract its recipe.
+
+## License
+
+Released under the [MIT License](LICENSE) © 2026 Olivier Lüthy. You're free to use, modify and distribute this
+software, including commercially, as long as the copyright notice and license are included.
+
+## Author
+
+Built by **Olivier Lüthy** — [GitHub](https://github.com/olivierluethy).
